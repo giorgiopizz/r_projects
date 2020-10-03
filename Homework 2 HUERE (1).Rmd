@@ -35,7 +35,14 @@ library(readxl)
 install.packages("vroom")
 library(vroom)
 
+install.packages("dplyr")
 library(dplyr)
+
+install.packages("grid")
+library(grid)
+
+install.packages("gridExtra")
+library(gridExtra)
 
 # Challenge 1: CDC COVID-19 Public Use Data
 
@@ -58,7 +65,6 @@ covid_data <- vroom::vroom(url)%>%
 
 #& current_status == "Laboratory-confirmed case" 
 clean_data <- covid_data %>% filter((hosp_yn == "Yes" | hosp_yn == "No") & (race_and_ethnicity_combined != "Unknown")  & (medcond_yn == "Yes"|medcond_yn == "No") & current_status == "Laboratory-confirmed case" & (icu_yn == "Yes"|icu_yn == "No")  & (death_yn == "Yes"|death_yn == "No")  & age_group!="Unknown") %>% drop_na()
-
 
 
 ages <- levels(factor(clean_data$age_group))
@@ -86,38 +92,43 @@ plots <- function(ibool, isex, icondition){
     print(length(v))
     
     df <- data.frame("ages" = ages, "perc" = v)
+      
     
-    p<-ggplot(data=df, aes(x=v, y=ages)) +
-      geom_bar(stat="identity", fill="steelblue")+
-    geom_text(aes(label=v),hjust = -0.5,position = position_dodge(width = 1),  color="black", size=3.5)+
+    p<-ggplot(data=df, aes(x=v, y=ages)) + 
+      geom_text(aes(label=v),hjust = -0.5,position = position_dodge(width = 1),  color="black", size=3.5)+
     theme (panel.background = element_rect(fill ="white",colour = "black",
                                 size = 0.5, linetype = "solid"),
              panel.grid.major = element_line(size = 0.5, linetype = 'solid',
                                 colour = "grey"), 
   panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
                                 colour = "grey"))
+    if(ibool==0){
+      p <- p+ geom_bar(stat="identity", fill="steelblue")
+    }
+    else{
+       p <- p+ geom_bar(stat="identity", fill="firebrick2")
+    }
+    
     return(p)
 
 }
 
 p1 <- plots(0,"Female","Yes") + facet_grid(~"Female" )  + theme(axis.title = element_blank(), axis.text.x = element_blank() , plot.margin=unit(c(0,0,-0.2,0), "cm")) + scale_x_continuous(limits=c(0, 50))
-p1
 p2 <- plots(0,"Male","Yes") + facet_grid("With comorbidities"~"Male" ) + theme(axis.title = element_blank(), axis.text = element_blank(), plot.margin=unit(c(0,0,-0.2,0), "cm")) + scale_x_continuous(limits=c(0, 50))
 p3 <- plots(0,"Female","No") +labs( x = "Death %")  + scale_x_continuous(limits=c(0, 50)) + theme(plot.margin=unit(c(0.2,0,0,0),"cm"), axis.title.y = element_blank())
 p4 <- plots(0,"Male","No") +labs( x = "Death %")+ facet_grid("Without comorbidities" ~ .) + theme(axis.title.y = element_blank(), axis.text.y = element_blank(), plot.margin=unit(c(0.2,0,0,0),"cm"))+ scale_x_continuous(limits=c(0, 50))
 
   
-big_plot1 <- grid.arrange(p1, p2,p3,p4, nrow = 2)
+big_plot1 <- grid.arrange(p1, p2,p3,p4, nrow = 2,top = textGrob("Comorbidities",gp=gpar(fontsize=20,font=3)))
 
 
 g1 <- plots(1,"Female","Yes") + facet_grid(~"Female" )  + theme(axis.title = element_blank(), axis.text.x = element_blank() , plot.margin=unit(c(0,0,-0.2,0), "cm")) + scale_x_continuous(limits=c(0, 80))
-g1
 g2 <- plots(1,"Male","Yes") + facet_grid("Admitted to ICU"~"Male" ) + theme(axis.title = element_blank(), axis.text = element_blank(), plot.margin=unit(c(0,0,-0.2,0), "cm")) + scale_x_continuous(limits=c(0, 80))
 g3 <- plots(1,"Female","No") +labs( x = "Death %")  + scale_x_continuous(limits=c(0, 80)) + theme(plot.margin=unit(c(0.2,0,0,0),"cm"), axis.title.y = element_blank())
 g4 <- plots(1,"Male","No") +labs( x = "Death %")+ facet_grid("No ICU" ~ .) + theme(axis.title.y = element_blank(), axis.text.y = element_blank(), plot.margin=unit(c(0.2,0,0,0),"cm"))+ scale_x_continuous(limits=c(0, 80))
 
   
-big_plot2 <- grid.arrange(g1, g2,g3,g4, nrow = 2)
+big_plot2 <- grid.arrange(g1, g2,g3,g4, nrow = 2,top = textGrob("ICU",gp=gpar(fontsize=20,font=3)))
 
 
 grid.arrange(big_plot1, big_plot2, nrow=2)
