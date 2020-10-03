@@ -1,0 +1,137 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+#Installing and loading useful libraries
+
+install.packages("tidyverse")
+library(tidyverse)
+
+install.packages("mosaic")
+library(mosaic)
+
+install.packages("ggthemes")
+library(ggthemes)
+
+install.packages("lubridate")
+library(lubridate)
+
+install.packages("here")
+library(here)
+
+install.packages("skimr")
+library(skimr)
+
+install.packages("janitor")
+library(janitor)
+
+install.packages("httr")
+library(httr)
+
+install.packages("readxl")
+library(readxl)
+
+install.packages("vroom")
+library(vroom)
+
+library(dplyr)
+
+# Challenge 1: CDC COVID-19 Public Use Data
+
+Let us revisit the [CDC Covid-19 Case Surveillance Data](https://data.cdc.gov/Case-Surveillance/COVID-19-Case-Surveillance-Public-Use-Data/vbim-akqf). There are well over 3 million entries of individual, de-identified patient data. Since this is a large file, I suggest you use `vroom` to load it and you keep `cache=TRUE` in the chunk options.
+
+
+```{r, cache=TRUE}
+# file contains 11 variables and 3.66m rows and is well over 380Mb. 
+# It will take time to download
+
+# URL link to CDC to download data
+url <- "https://data.cdc.gov/api/views/vbim-akqf/rows.csv?accessType=DOWNLOAD"
+
+covid_data <- vroom::vroom(url)%>%
+  clean_names() %>%
+ glimpse()
+
+# & cdc_report_dt != NA & pos_spec_dt != NA & onset_dt != NA
+
+
+#& current_status == "Laboratory-confirmed case" 
+clean_data <- covid_data %>% filter((hosp_yn == "Yes" | hosp_yn == "No") & (race_and_ethnicity_combined != "Unknown")  & (medcond_yn == "Yes"|medcond_yn == "No") & current_status == "Laboratory-confirmed case" & (icu_yn == "Yes"|icu_yn == "No")  & (death_yn == "Yes"|death_yn == "No")  & age_group!="Unknown") %>% drop_na()
+
+
+
+ages <- levels(factor(clean_data$age_group))
+
+plots <- function(ibool, isex, icondition){
+  if (ibool == 0){
+    #ibool == 0 means it's medcond
+    new <- clean_data %>% filter(sex== isex & medcond_yn== icondition)
+  }
+  
+  else if (ibool == 1){
+    #ibool == 0 means it's icu
+    new <- clean_data %>% filter(sex == isex & icu_yn == icondition)
+  }
+  else{
+    return(0)
+  }
+    new_dead <- new %>% filter(death_yn=="Yes")
+    v <- c()
+    for (i in 1:9){
+      perc <- nrow(new_dead %>% filter(age_group == ages[i]))*100/nrow(new %>% filter(age_group == ages[i]))
+      v <- append(v, round(perc,1))
+    }
+    print(v)
+    print(length(v))
+    
+    df <- data.frame("ages" = ages, "perc" = v)
+    
+    p<-ggplot(data=df, aes(x=v, y=ages)) +
+      geom_bar(stat="identity", fill="steelblue")+
+    geom_text(aes(label=v),hjust = -0.5,position = position_dodge(width = 1),  color="black", size=3.5)+
+    theme (panel.background = element_rect(fill ="white",colour = "black",
+                                size = 0.5, linetype = "solid"),
+             panel.grid.major = element_line(size = 0.5, linetype = 'solid',
+                                colour = "grey"), 
+  panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
+                                colour = "grey"))
+    return(p)
+
+}
+
+p1 <- plots(0,"Female","Yes") + facet_grid(~"Female" )  + theme(axis.title = element_blank(), axis.text.x = element_blank() , plot.margin=unit(c(0,0,-0.2,0), "cm")) + scale_x_continuous(limits=c(0, 50))
+p1
+p2 <- plots(0,"Male","Yes") + facet_grid("With comorbidities"~"Male" ) + theme(axis.title = element_blank(), axis.text = element_blank(), plot.margin=unit(c(0,0,-0.2,0), "cm")) + scale_x_continuous(limits=c(0, 50))
+p3 <- plots(0,"Female","No") +labs( x = "Death %")  + scale_x_continuous(limits=c(0, 50)) + theme(plot.margin=unit(c(0.2,0,0,0),"cm"), axis.title.y = element_blank())
+p4 <- plots(0,"Male","No") +labs( x = "Death %")+ facet_grid("Without comorbidities" ~ .) + theme(axis.title.y = element_blank(), axis.text.y = element_blank(), plot.margin=unit(c(0.2,0,0,0),"cm"))+ scale_x_continuous(limits=c(0, 50))
+
+  
+big_plot1 <- grid.arrange(p1, p2,p3,p4, nrow = 2)
+
+
+g1 <- plots(1,"Female","Yes") + facet_grid(~"Female" )  + theme(axis.title = element_blank(), axis.text.x = element_blank() , plot.margin=unit(c(0,0,-0.2,0), "cm")) + scale_x_continuous(limits=c(0, 80))
+g1
+g2 <- plots(1,"Male","Yes") + facet_grid("Admitted to ICU"~"Male" ) + theme(axis.title = element_blank(), axis.text = element_blank(), plot.margin=unit(c(0,0,-0.2,0), "cm")) + scale_x_continuous(limits=c(0, 80))
+g3 <- plots(1,"Female","No") +labs( x = "Death %")  + scale_x_continuous(limits=c(0, 80)) + theme(plot.margin=unit(c(0.2,0,0,0),"cm"), axis.title.y = element_blank())
+g4 <- plots(1,"Male","No") +labs( x = "Death %")+ facet_grid("No ICU" ~ .) + theme(axis.title.y = element_blank(), axis.text.y = element_blank(), plot.margin=unit(c(0.2,0,0,0),"cm"))+ scale_x_continuous(limits=c(0, 80))
+
+  
+big_plot2 <- grid.arrange(g1, g2,g3,g4, nrow = 2)
+
+
+grid.arrange(big_plot1, big_plot2, nrow=2)
+
+
+
+
+
+
+#2 Death % rate by age group, sex, and whether the patient was admited to Intensive Care Unit or not
+
+
+
+```{r covid_challenge, echo=FALSE, out.width="100%"}
+knitr::include_graphics(here::here("images", "covid_death_rate_comorbidities.png"), error = FALSE)
+knitr::include_graphics(here::here("images", "covid_death_rate_icu.png"), error = FALSE)
+```
